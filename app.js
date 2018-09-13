@@ -23,7 +23,9 @@ const logger = flaschenpost.getLogger();
 
 const keysDirectory = processenv('KEYS');
 
-const port = processenv('PORT') || 443,
+const identityProviderCertificatePath = processenv('IDENTITYPROVIDER_CERTIFICATE'),
+      identityProviderName = processenv('IDENTITYPROVIDER_NAME'),
+      port = processenv('PORT') || 443,
       statusCorsOrigin = processenv('STATUS_CORS_ORIGIN') || '*',
       statusPort = processenv('STATUS_PORT') || 3333;
 
@@ -33,6 +35,8 @@ const providerConfiguration = getProviderConfiguration();
   try {
     const certificate = await readFile(path.join(keysDirectory, 'certificate.pem'), { encoding: 'utf8' }),
           privateKey = await readFile(path.join(keysDirectory, 'privateKey.pem'), { encoding: 'utf8' });
+
+    const identityProviderCertificate = await readFile(path.join(identityProviderCertificatePath, 'certificate.pem'));
 
     const app = tailwind.createApp({});
 
@@ -45,7 +49,13 @@ const providerConfiguration = getProviderConfiguration();
 
     await provider.initialize(providerConfiguration);
 
-    const api = getApi({ provider });
+    const api = getApi({
+      identityProvider: {
+        name: identityProviderName,
+        certificate: identityProviderCertificate
+      },
+      provider
+    });
 
     spdy.createServer({
       key: privateKey,

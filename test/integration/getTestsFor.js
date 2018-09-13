@@ -1,24 +1,52 @@
 'use strict';
 
-const http = require('http'),
+const fs = require('fs'),
+      http = require('http'),
+      path = require('path'),
+      { promisify } = require('util'),
       { Readable } = require('stream');
 
 const assert = require('assertthat'),
       freePort = require('freeport-promise'),
+      nodeenv = require('nodeenv'),
       requestPromise = require('request-promise-native'),
       uuid = require('uuidv4');
 
 const getApi = require('../../lib/getApi'),
       postAddBlob = require('./postAddBlob');
 
+const readFile = promisify(fs.readFile);
+
 const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
   suite('api', () => {
+    let restore;
+
+    suiteSetup(() => {
+      // Disable SSL certificate checks to allow running these tests with a
+      // self-signed certificate.
+      restore = nodeenv({
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
+      });
+    });
+
+    suiteTeardown(() => {
+      restore();
+    });
+
     let port;
 
     setup(async () => {
       await setupProvider();
 
-      const api = getApi({ provider });
+      const identityProviderCertificate = await readFile(path.join(__dirname, '..', 'shared', 'keys', 'certificate.pem'));
+
+      const api = getApi({
+        identityProvider: {
+          name: 'auth.wolkenkit.io',
+          certificate: identityProviderCertificate
+        },
+        provider
+      });
 
       port = await freePort();
 
