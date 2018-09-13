@@ -1,0 +1,52 @@
+{
+  "name": "wolkenkit-depot",
+  "version": "0.0.0",
+  "description": "wolkenkit-depot is a blob server.",
+  "contributors": [
+    {
+      "name": "Golo Roden",
+      "email": "golo.roden@thenativeweb.io"
+    },
+    {
+      "name": "Jan-Hendrik Grundhöfer",
+      "email": "jan-hendrik.grundhoefer@thenativeweb.io"
+    }
+  ],
+  "dependencies": {
+    "async-retry": "1.2.3",
+    "common-tags": "1.8.0",
+    "cors": "2.8.4",
+    "defekt": "1.0.0",
+    "express": "4.16.3",
+    "flaschenpost": "1.1.1",
+    "isolated": "1.0.0",
+    "lodash": "4.17.10",
+    "minio": "7.0.1",
+    "processenv": "1.1.0",
+    "pump": "3.0.0",
+    "require-dir": "1.0.0",
+    "shelljs": "0.8.2",
+    "spdy": "3.4.7",
+    "stream-to-string": "1.1.0",
+    "tailwind": "2.3.1",
+    "uuidv4": "1.0.1"
+  },
+  "devDependencies": {
+    "assertthat": "1.0.0",
+    "freeport-promise": "1.1.0",
+    "request": "2.88.0",
+    "request-promise-native": "1.0.5",
+    "roboter": "1.0.7"
+  },
+  "scripts": {
+    "build": "docker build -t thenativeweb/wolkenkit-depot ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/thenativeweb/wolkenkit-depot.git"
+  },
+  "keywords": [
+    "wolkenkit"
+  ],
+  "license": "AGPL-3.0"
+}
