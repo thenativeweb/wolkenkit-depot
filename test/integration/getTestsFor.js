@@ -13,6 +13,7 @@ const assert = require('assertthat'),
       uuid = require('uuidv4');
 
 const getApi = require('../../lib/getApi'),
+      issueToken = require('./issueToken'),
       postAddBlob = require('./postAddBlob');
 
 const readFile = promisify(fs.readFile);
@@ -35,12 +36,13 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
 
     let port;
 
-    setup(async () => {
+    const startServer = async function ({ addBlobAuthorizationOptions }) {
       await setupProvider();
 
       const identityProviderCertificate = await readFile(path.join(__dirname, '..', 'shared', 'keys', 'certificate.pem'));
 
       const api = getApi({
+        addBlobAuthorizationOptions,
         identityProvider: {
           name: 'auth.wolkenkit.io',
           certificate: identityProviderCertificate
@@ -50,7 +52,18 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
 
       port = await freePort();
 
-      http.createServer(api).listen(port);
+      await new Promise(resolve => {
+        http.createServer(api).listen(port, resolve);
+      });
+    };
+
+    setup(async () => {
+      await startServer({
+        addBlobAuthorizationOptions: {
+          forAuthenticated: true,
+          forPublic: true
+        }
+      });
     });
 
     teardown(async () => {
@@ -95,6 +108,53 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         assert.that(response.body).is.ofType('object');
         assert.that(response.body.id).is.ofType('string');
       });
+
+      test('returns the status code 400 if the x-metadata header contains malformed isAuthorized.', async () => {
+        const isAuthorized = {
+          foo: 'bar'
+        };
+        const headers = {
+          'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png', isAuthorized })
+        };
+
+        const response = await postAddBlob(port, headers);
+
+        assert.that(response.statusCode).is.equalTo(400);
+      });
+
+      test('returns an id if the x-metadata header contains valid isAuthorized.', async () => {
+        const isAuthorized = {
+          commands: {
+            removeBlob: {
+              forAuthenticated: true,
+              forPublic: false
+            },
+            transferOwnership: {
+              forAuthenticated: false,
+              forPublic: false
+            },
+            authorize: {
+              forAuthenticated: false,
+              forPublic: false
+            }
+          },
+          queries: {
+            getBlob: {
+              forAuthenticated: true,
+              forPublic: true
+            }
+          }
+        };
+        const headers = {
+          'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png', isAuthorized })
+        };
+
+        const response = await postAddBlob(port, headers);
+
+        assert.that(response.statusCode).is.equalTo(200);
+        assert.that(response.body).is.ofType('object');
+        assert.that(response.body.id).is.ofType('string');
+      });
     });
 
     suite('/api/v1/blob/:id', () => {
@@ -125,9 +185,14 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           resolveWithFullResponse: true
         });
 
+        const metadata = JSON.parse(res.headers['x-metadata']);
+
         assert.that(res.headers['content-type']).is.equalTo('application/octet-stream');
-        assert.that(res.headers['x-metadata']).is.equalTo(JSON.stringify({ id, fileName, contentType }));
         assert.that(res.headers['content-disposition']).is.equalTo(`inline; filename=${fileName}`);
+
+        assert.that(metadata.id).is.equalTo(id);
+        assert.that(metadata.fileName).is.equalTo(fileName);
+        assert.that(metadata.contentType).is.equalTo(contentType);
 
         assert.that(res).is.instanceOf(Readable);
       });
@@ -147,9 +212,14 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           resolveWithFullResponse: true
         });
 
+        const metadata = JSON.parse(res.headers['x-metadata']);
+
         assert.that(res.headers['content-type']).is.equalTo(contentType);
-        assert.that(res.headers['x-metadata']).is.equalTo(JSON.stringify({ id, fileName, contentType }));
         assert.that(res.headers['content-disposition']).is.equalTo(`inline; filename=${fileName}`);
+
+        assert.that(metadata.id).is.equalTo(id);
+        assert.that(metadata.fileName).is.equalTo(fileName);
+        assert.that(metadata.contentType).is.equalTo(contentType);
 
         assert.that(res).is.instanceOf(Readable);
       });
@@ -261,6 +331,331 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
             resolveWithFullResponse: true
           });
         }).is.throwingAsync(ex => ex.statusCode === 404);
+      });
+    });
+
+    suite('authorization', () => {
+      const tokenOwner = issueToken('Jane Doe');
+
+      suite('adding blobs', () => {
+        suite('when access is limited to authenticated users', () => {
+          setup(async () => {
+            await startServer({
+              addBlobAuthorizationOptions: {
+                forAuthenticated: true,
+                forPublic: false
+              }
+            });
+          });
+
+          test('grants access to authenticated users.', async () => {
+            const headers = {
+              'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }),
+              authorization: `Bearer ${tokenOwner}`
+            };
+
+            const response = await postAddBlob(port, headers);
+
+            assert.that(response.statusCode).is.equalTo(200);
+          });
+
+          test('denies access to public users.', async () => {
+            const headers = {
+              'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' })
+            };
+
+            const response = await postAddBlob(port, headers);
+
+            assert.that(response.statusCode).is.equalTo(401);
+          });
+        });
+
+        suite('when access is limited to authenticated and public users', () => {
+          setup(async () => {
+            await startServer({
+              addBlobAuthorizationOptions: {
+                forAuthenticated: true,
+                forPublic: true
+              }
+            });
+          });
+
+          test('grants access to authenticated users.', async () => {
+            const headers = {
+              'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }),
+              authorization: `Bearer ${tokenOwner}`
+            };
+
+            const response = await postAddBlob(port, headers);
+
+            assert.that(response.statusCode).is.equalTo(200);
+          });
+
+          test('grants access to public users.', async () => {
+            const headers = {
+              'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' })
+            };
+
+            const response = await postAddBlob(port, headers);
+
+            assert.that(response.statusCode).is.equalTo(200);
+          });
+        });
+
+        suite('when access is forbidden', () => {
+          setup(async () => {
+            await startServer({
+              addBlobAuthorizationOptions: {
+                forAuthenticated: false,
+                forPublic: false
+              }
+            });
+          });
+
+          test('denies access to authenticated users.', async () => {
+            const headers = {
+              'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }),
+              authorization: `Bearer ${tokenOwner}`
+            };
+
+            const response = await postAddBlob(port, headers);
+
+            assert.that(response.statusCode).is.equalTo(401);
+          });
+
+          test('denies access to public users.', async () => {
+            const headers = {
+              'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' })
+            };
+
+            const response = await postAddBlob(port, headers);
+
+            assert.that(response.statusCode).is.equalTo(401);
+          });
+        });
+      });
+
+      suite('when access is limited to owner', () => {
+        let id;
+
+        setup(async () => {
+          const isAuthorized = {
+            queries: {
+              getBlob: { forAuthenticated: false, forPublic: false }
+            }
+          };
+          const headersAdd = {
+            'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png', isAuthorized }),
+            authorization: `Bearer ${tokenOwner}`
+          };
+          const responseAdd = await postAddBlob(port, headersAdd);
+
+          id = responseAdd.body.id;
+        });
+
+        test('grants access to the owner.', async () => {
+          const responseGet = await requestPromise({
+            method: 'GET',
+            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            headers: {
+              authorization: `Bearer ${tokenOwner}`
+            },
+            resolveWithFullResponse: true
+          });
+
+          assert.that(responseGet.statusCode).is.equalTo(200);
+        });
+
+        test('denies access to authenticated users.', async () => {
+          const tokenOther = issueToken('John Doe');
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'GET',
+              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              headers: {
+                authorization: `Bearer ${tokenOther}`
+              },
+              resolveWithFullResponse: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 401);
+        });
+
+        test('denies access to public users.', async () => {
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'GET',
+              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              resolveWithFullResponse: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 401);
+        });
+      });
+
+      suite('when access is limited to authenticated users', () => {
+        let id;
+
+        setup(async () => {
+          const isAuthorized = {
+            queries: {
+              getBlob: { forAuthenticated: true, forPublic: false }
+            }
+          };
+          const headersAdd = {
+            'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png', isAuthorized }),
+            authorization: `Bearer ${tokenOwner}`
+          };
+          const responseAdd = await postAddBlob(port, headersAdd);
+
+          id = responseAdd.body.id;
+        });
+
+        test('grants access to the owner.', async () => {
+          const responseGet = await requestPromise({
+            method: 'GET',
+            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            headers: {
+              authorization: `Bearer ${tokenOwner}`
+            },
+            resolveWithFullResponse: true
+          });
+
+          assert.that(responseGet.statusCode).is.equalTo(200);
+        });
+
+        test('grants access to authenticated users.', async () => {
+          const tokenOther = issueToken('John Doe');
+
+          const responseGet = await requestPromise({
+            method: 'GET',
+            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            headers: {
+              authorization: `Bearer ${tokenOther}`
+            },
+            resolveWithFullResponse: true
+          });
+
+          assert.that(responseGet.statusCode).is.equalTo(200);
+        });
+
+        test('denies access to public users.', async () => {
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'GET',
+              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              resolveWithFullResponse: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 401);
+        });
+      });
+
+      suite('when access is limited to authenticated and public users', () => {
+        let id;
+
+        setup(async () => {
+          const isAuthorized = {
+            queries: {
+              getBlob: { forAuthenticated: true, forPublic: true }
+            }
+          };
+          const headersAdd = {
+            'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png', isAuthorized }),
+            authorization: `Bearer ${tokenOwner}`
+          };
+          const responseAdd = await postAddBlob(port, headersAdd);
+
+          id = responseAdd.body.id;
+        });
+
+        test('grants access to the owner.', async () => {
+          const responseGet = await requestPromise({
+            method: 'GET',
+            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            headers: {
+              authorization: `Bearer ${tokenOwner}`
+            },
+            resolveWithFullResponse: true
+          });
+
+          assert.that(responseGet.statusCode).is.equalTo(200);
+        });
+
+        test('grants access to authenticated users.', async () => {
+          const tokenOther = issueToken('John Doe');
+
+          const responseGet = await requestPromise({
+            method: 'GET',
+            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            headers: {
+              authorization: `Bearer ${tokenOther}`
+            },
+            resolveWithFullResponse: true
+          });
+
+          assert.that(responseGet.statusCode).is.equalTo(200);
+        });
+
+        test('grants access to public users.', async () => {
+          const responseGet = await requestPromise({
+            method: 'GET',
+            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            resolveWithFullResponse: true
+          });
+
+          assert.that(responseGet.statusCode).is.equalTo(200);
+        });
+      });
+
+      suite('when access is set to defaults', () => {
+        let id;
+
+        setup(async () => {
+          const headersAdd = {
+            'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }),
+            authorization: `Bearer ${tokenOwner}`
+          };
+          const responseAdd = await postAddBlob(port, headersAdd);
+
+          id = responseAdd.body.id;
+        });
+
+        test('grants access to the owner.', async () => {
+          const responseGet = await requestPromise({
+            method: 'GET',
+            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            headers: {
+              authorization: `Bearer ${tokenOwner}`
+            },
+            resolveWithFullResponse: true
+          });
+
+          assert.that(responseGet.statusCode).is.equalTo(200);
+        });
+
+        test('denies access to authenticated users.', async () => {
+          const tokenOther = issueToken('John Doe');
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'GET',
+              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              headers: {
+                authorization: `Bearer ${tokenOther}`
+              },
+              resolveWithFullResponse: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 401);
+        });
+
+        test('denies access to public users.', async () => {
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'GET',
+              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              resolveWithFullResponse: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 401);
+        });
       });
     });
   });
