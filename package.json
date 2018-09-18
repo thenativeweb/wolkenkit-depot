@@ -31,7 +31,7 @@
     "stream-to-string": "1.1.0",
     "tailwind": "2.3.1",
     "uuidv4": "1.0.1",
-    "validate-value": "thenativeweb/validate-value#0.1.0"
+    "validate-value": "1.0.0"
   },
   "devDependencies": {
     "assertthat": "1.0.0",
