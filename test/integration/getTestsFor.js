@@ -789,6 +789,153 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           }).is.throwingAsync(ex => ex.statusCode === 401);
         });
       });
+
+      suite('/api/v1/authorize', () => {
+        test('returns the status code 400 if the x-metadata header is not set.', async () => {
+          const headers = {};
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'POST',
+              uri: `http://localhost:${port}/api/v1/authorize`,
+              headers,
+              json: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 400);
+        });
+
+        test('returns the status code 400 if the x-metadata header is not json formatted.', async () => {
+          const headers = {
+            'x-metadata': 'not-json'
+          };
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'POST',
+              uri: `http://localhost:${port}/api/v1/authorize`,
+              headers,
+              json: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 400);
+        });
+
+        test('returns the status code 400 if the x-metadata header does not contain the id.', async () => {
+          const headers = {
+            'x-metadata': JSON.stringify({ isAuthorized: {}})
+          };
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'POST',
+              uri: `http://localhost:${port}/api/v1/authorize`,
+              headers,
+              json: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 400);
+        });
+
+        test('returns the status code 400 if the x-metadata header does not contain the isAuthorized.', async () => {
+          const headers = {
+            'x-metadata': JSON.stringify({ id: uuid() })
+          };
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'POST',
+              uri: `http://localhost:${port}/api/v1/authorize`,
+              headers,
+              json: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 400);
+        });
+
+        test('returns the status code 404 if the blob was not found.', async () => {
+          const id = 'not-exists';
+          const isAuthorized = {};
+          const headers = {
+            'x-metadata': JSON.stringify({ id, isAuthorized })
+          };
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'POST',
+              uri: `http://localhost:${port}/api/v1/authorize`,
+              headers,
+              json: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 404);
+        });
+
+        test('returns the status code 400 if the x-metadata header contains malformed isAuthorized.', async () => {
+          const headersAdd = {
+            'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }),
+            authorization: `Bearer ${tokenOwner}`
+          };
+
+          const responseAdd = await postAddBlob(port, headersAdd);
+          const id = responseAdd.body.id;
+
+          const isAuthorized = {
+            foo: 'bar'
+          };
+          const headers = {
+            'x-metadata': JSON.stringify({ id, isAuthorized }),
+            authorization: `Bearer ${tokenOwner}`
+          };
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'POST',
+              uri: `http://localhost:${port}/api/v1/authorize`,
+              headers,
+              json: true,
+              resolveWithFullResponse: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 400);
+        });
+
+        test('changes the authorization.', async () => {
+          const headersAdd = {
+            'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }),
+            authorization: `Bearer ${tokenOwner}`
+          };
+
+          const responseAdd = await postAddBlob(port, headersAdd);
+          const id = responseAdd.body.id;
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'GET',
+              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              resolveWithFullResponse: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 401);
+
+          const isAuthorized = { queries: { getBlob: { forPublic: true }}};
+          const headersAuthorize = {
+            'x-metadata': JSON.stringify({ id, isAuthorized }),
+            authorization: `Bearer ${tokenOwner}`
+          };
+
+          const responseAuthorize = await requestPromise({
+            method: 'POST',
+            uri: `http://localhost:${port}/api/v1/authorize`,
+            headers: headersAuthorize,
+            json: true,
+            resolveWithFullResponse: true
+          });
+
+          assert.that(responseAuthorize.statusCode).is.equalTo(200);
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'GET',
+              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              resolveWithFullResponse: true
+            });
+          }).is.not.throwingAsync();
+        });
+      });
     });
   });
 };
