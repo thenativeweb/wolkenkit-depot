@@ -16,21 +16,21 @@
     "async-retry": "1.2.3",
     "common-tags": "1.8.0",
     "cors": "2.8.4",
-    "defekt": "1.0.0",
-    "express": "4.16.3",
+    "defekt": "2.0.0",
+    "express": "4.16.4",
     "flaschenpost": "1.1.1",
     "isolated": "1.0.0",
     "limes": "1.0.1",
-    "lodash": "4.17.10",
+    "lodash": "4.17.11",
     "minio": "7.0.1",
     "processenv": "1.1.0",
     "pump": "3.0.0",
-    "require-dir": "1.0.0",
+    "require-dir": "1.1.0",
     "shelljs": "0.8.2",
     "spdy": "3.4.7",
     "stream-to-string": "1.1.0",
-    "tailwind": "2.3.1",
-    "uuidv4": "1.0.1",
+    "tailwind": "2.4.0",
+    "uuidv4": "2.0.0",
     "validate-value": "1.0.0"
   },
   "devDependencies": {
@@ -39,7 +39,7 @@
     "nodeenv": "1.0.0",
     "request": "2.88.0",
     "request-promise-native": "1.0.5",
-    "roboter": "1.0.7"
+    "roboter": "2.0.0"
   },
   "scripts": {
     "build": "docker build -t thenativeweb/wolkenkit-depot ."

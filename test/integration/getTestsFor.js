@@ -657,6 +657,138 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           }).is.throwingAsync(ex => ex.statusCode === 401);
         });
       });
+
+      suite('/api/v1/transfer-ownership', () => {
+        const tokenOther = issueToken('John Doe');
+
+        test('returns the status code 400 if the x-metadata header is not set.', async () => {
+          const headers = {
+            'x-to': 'John Doe'
+          };
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'POST',
+              uri: `http://localhost:${port}/api/v1/transfer-ownership`,
+              headers,
+              json: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 400);
+        });
+
+        test('returns the status code 400 if the x-metadata header is not json formatted.', async () => {
+          const headers = {
+            'x-metadata': 'not-json',
+            'x-to': 'John Doe'
+          };
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'POST',
+              uri: `http://localhost:${port}/api/v1/transfer-ownership`,
+              headers,
+              json: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 400);
+        });
+
+        test('returns the status code 400 if the x-metadata header does not contain the id.', async () => {
+          const headers = {
+            'x-metadata': JSON.stringify({}),
+            'x-to': 'John Doe'
+          };
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'POST',
+              uri: `http://localhost:${port}/api/v1/transfer-ownership`,
+              headers,
+              json: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 400);
+        });
+
+        test('returns the status code 400 if the x-to header is not set.', async () => {
+          const id = uuid();
+          const headers = {
+            'x-metadata': JSON.stringify({ id })
+          };
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'POST',
+              uri: `http://localhost:${port}/api/v1/transfer-ownership`,
+              headers,
+              json: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 400);
+        });
+
+        test('returns the status code 404 if the blob was not found.', async () => {
+          const id = 'not-exists';
+          const headers = {
+            'x-metadata': JSON.stringify({ id }),
+            'x-to': 'John Doe'
+          };
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'POST',
+              uri: `http://localhost:${port}/api/v1/transfer-ownership`,
+              headers,
+              json: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 404);
+        });
+
+        test('transfers the ownership.', async () => {
+          const headersAdd = {
+            'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }),
+            authorization: `Bearer ${tokenOwner}`
+          };
+
+          const responseAdd = await postAddBlob(port, headersAdd);
+          const id = responseAdd.body.id;
+
+          const headersTransferOwnership = {
+            'x-metadata': JSON.stringify({ id }),
+            'x-to': 'John Doe',
+            authorization: `Bearer ${tokenOwner}`
+          };
+
+          const responseTransferOwnership = await requestPromise({
+            method: 'POST',
+            uri: `http://localhost:${port}/api/v1/transfer-ownership`,
+            headers: headersTransferOwnership,
+            json: true,
+            resolveWithFullResponse: true
+          });
+
+          assert.that(responseTransferOwnership.statusCode).is.equalTo(200);
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'GET',
+              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              headers: {
+                authorization: `Bearer ${tokenOther}`
+              },
+              resolveWithFullResponse: true
+            });
+          }).is.not.throwingAsync();
+
+          await assert.that(async () => {
+            await requestPromise({
+              method: 'GET',
+              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              headers: {
+                authorization: `Bearer ${tokenOwner}`
+              },
+              resolveWithFullResponse: true
+            });
+          }).is.throwingAsync(ex => ex.statusCode === 401);
+        });
+      });
     });
   });
 };
