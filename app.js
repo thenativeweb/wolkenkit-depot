@@ -24,7 +24,7 @@ const logger = flaschenpost.getLogger();
 
 const keysDirectory = processenv('KEYS');
 
-const addBlobAuthorizationOptions = processenv('IS_AUTHORIZED_COMMANDS_ADD_BLOB', JSON.stringify({ forAuthenticated: true, forPublic: false })),
+const addBlobAuthorizationOptions = processenv('IS_AUTHORIZED_COMMANDS_ADD_BLOB', { forAuthenticated: true, forPublic: false }),
       identityProviderCertificatePath = processenv('IDENTITYPROVIDER_CERTIFICATE'),
       identityProviderName = processenv('IDENTITYPROVIDER_NAME'),
       port = processenv('PORT') || 443,
