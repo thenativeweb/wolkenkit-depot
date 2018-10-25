@@ -54,13 +54,6 @@ const providerConfiguration = getProviderConfiguration();
       throw new Error('Environment variable \'IS_AUTHORIZED_COMMANDS_ADD_BLOB\' is malformed.');
     }
 
-    const app = tailwind.createApp({});
-
-    await app.status.use(new app.wires.status.http.Server({
-      port: statusPort,
-      corsOrigin: statusCorsOrigin
-    }));
-
     const provider = new providers[providerConfiguration.type]();
 
     await provider.initialize(providerConfiguration);
@@ -74,12 +67,25 @@ const providerConfiguration = getProviderConfiguration();
       provider
     });
 
-    spdy.createServer({
-      key: privateKey,
-      cert: certificate
-    }, api).listen(port, () => {
-      logger.info('Server started.', { port });
+    await new Promise((resolve, reject) => {
+      try {
+        spdy.createServer({
+          key: privateKey,
+          cert: certificate
+        }, api).listen(port, resolve);
+      } catch (ex) {
+        reject(ex);
+      }
     });
+
+    const app = tailwind.createApp({});
+
+    await app.status.use(new app.wires.status.http.Server({
+      port: statusPort,
+      corsOrigin: statusCorsOrigin
+    }));
+
+    logger.info('Server started.', { port });
   } catch (ex) {
     logger.fatal('An unexpected error occured.', { err: ex });
 
