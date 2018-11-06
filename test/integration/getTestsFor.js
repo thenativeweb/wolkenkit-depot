@@ -8,7 +8,6 @@ const fs = require('fs'),
 
 const assert = require('assertthat'),
       freePort = require('freeport-promise'),
-      nodeenv = require('nodeenv'),
       requestPromise = require('request-promise-native'),
       uuid = require('uuidv4');
 
@@ -20,20 +19,6 @@ const readFile = promisify(fs.readFile);
 
 const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
   suite('api', () => {
-    let restore;
-
-    suiteSetup(() => {
-      // Disable SSL certificate checks to allow running these tests with a
-      // self-signed certificate.
-      restore = nodeenv({
-        NODE_TLS_REJECT_UNAUTHORIZED: '0'
-      });
-    });
-
-    suiteTeardown(() => {
-      restore();
-    });
-
     let port;
 
     const startServer = async function ({ addBlobAuthorizationOptions }) {

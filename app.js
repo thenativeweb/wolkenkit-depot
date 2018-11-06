@@ -5,6 +5,7 @@ const prepareErrorHandling = require('./lib/process/prepareErrorHandling');
 prepareErrorHandling();
 
 const fs = require('fs'),
+      http = require('http'),
       path = require('path'),
       { promisify } = require('util');
 
@@ -25,11 +26,12 @@ const logger = flaschenpost.getLogger();
 const keysDirectory = processenv('KEYS');
 
 const addBlobAuthorizationOptions = processenv('IS_AUTHORIZED_COMMANDS_ADD_BLOB', { forAuthenticated: true, forPublic: false }),
+      httpPort = processenv('HTTP_PORT', 80),
+      httpsPort = processenv('HTTPS_PORT', 443),
       identityProviderCertificatePath = processenv('IDENTITYPROVIDER_CERTIFICATE'),
       identityProviderName = processenv('IDENTITYPROVIDER_NAME'),
-      port = processenv('PORT') || 443,
-      statusCorsOrigin = processenv('STATUS_CORS_ORIGIN') || '*',
-      statusPort = processenv('STATUS_PORT') || 3333;
+      statusCorsOrigin = processenv('STATUS_CORS_ORIGIN', '*'),
+      statusPort = processenv('STATUS_PORT', 3333);
 
 const providerConfiguration = getProviderConfiguration();
 
@@ -69,10 +71,18 @@ const providerConfiguration = getProviderConfiguration();
 
     await new Promise((resolve, reject) => {
       try {
+        http.createServer(api).listen(httpPort, resolve);
+      } catch (ex) {
+        reject(ex);
+      }
+    });
+
+    await new Promise((resolve, reject) => {
+      try {
         spdy.createServer({
           key: privateKey,
           cert: certificate
-        }, api).listen(port, resolve);
+        }, api).listen(httpsPort, resolve);
       } catch (ex) {
         reject(ex);
       }
@@ -85,7 +95,12 @@ const providerConfiguration = getProviderConfiguration();
       corsOrigin: statusCorsOrigin
     }));
 
-    logger.info('Server started.', { port });
+    logger.info('Server started.', {
+      ports: {
+        https: httpsPort,
+        http: httpPort
+      }
+    });
   } catch (ex) {
     logger.fatal('An unexpected error occured.', { err: ex });
 
