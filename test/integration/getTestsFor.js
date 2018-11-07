@@ -13,7 +13,7 @@ const assert = require('assertthat'),
 
 const getApi = require('../../lib/getApi'),
       issueToken = require('./issueToken'),
-      postAddBlob = require('./postAddBlob');
+      postAddFile = require('./postAddFile');
 
 const readFile = promisify(fs.readFile);
 
@@ -21,13 +21,13 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
   suite('api', () => {
     let port;
 
-    const startServer = async function ({ addBlobAuthorizationOptions }) {
+    const startServer = async function ({ addFileAuthorizationOptions }) {
       await setupProvider();
 
       const identityProviderCertificate = await readFile(path.join(__dirname, '..', 'shared', 'keys', 'certificate.pem'));
 
       const api = getApi({
-        addBlobAuthorizationOptions,
+        addFileAuthorizationOptions,
         identityProvider: {
           name: 'auth.wolkenkit.io',
           certificate: identityProviderCertificate
@@ -44,7 +44,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
 
     setup(async () => {
       await startServer({
-        addBlobAuthorizationOptions: {
+        addFileAuthorizationOptions: {
           forAuthenticated: true,
           forPublic: true
         }
@@ -55,11 +55,11 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
       await teardownProvider();
     });
 
-    suite('/api/v1/add-blob', () => {
+    suite('/api/v1/add-file', () => {
       test('returns the status code 400 if the x-metadata header is not set.', async () => {
         const headers = {};
 
-        const response = await postAddBlob(port, headers);
+        const response = await postAddFile(port, headers);
 
         assert.that(response.statusCode).is.equalTo(400);
       });
@@ -69,7 +69,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           'x-metadata': 'not-json'
         };
 
-        const response = await postAddBlob(port, headers);
+        const response = await postAddFile(port, headers);
 
         assert.that(response.statusCode).is.equalTo(400);
       });
@@ -79,7 +79,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           'x-metadata': JSON.stringify({})
         };
 
-        const response = await postAddBlob(port, headers);
+        const response = await postAddFile(port, headers);
 
         assert.that(response.statusCode).is.equalTo(400);
       });
@@ -87,7 +87,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
       test('returns an id.', async () => {
         const headers = { 'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }) };
 
-        const response = await postAddBlob(port, headers);
+        const response = await postAddFile(port, headers);
 
         assert.that(response.statusCode).is.equalTo(200);
         assert.that(response.body).is.ofType('object');
@@ -102,7 +102,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png', isAuthorized })
         };
 
-        const response = await postAddBlob(port, headers);
+        const response = await postAddFile(port, headers);
 
         assert.that(response.statusCode).is.equalTo(400);
       });
@@ -110,7 +110,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
       test('returns an id if the x-metadata header contains valid isAuthorized.', async () => {
         const isAuthorized = {
           commands: {
-            removeBlob: {
+            removeFile: {
               forAuthenticated: true,
               forPublic: false
             },
@@ -124,7 +124,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
             }
           },
           queries: {
-            getBlob: {
+            getFile: {
               forAuthenticated: true,
               forPublic: true
             }
@@ -134,7 +134,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png', isAuthorized })
         };
 
-        const response = await postAddBlob(port, headers);
+        const response = await postAddFile(port, headers);
 
         assert.that(response.statusCode).is.equalTo(200);
         assert.that(response.body).is.ofType('object');
@@ -142,14 +142,14 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
       });
     });
 
-    suite('/api/v1/blob/:id', () => {
-      test('returns the status code 404 if the requested blob was not found.', async () => {
+    suite('/api/v1/file/:id', () => {
+      test('returns the status code 404 if the requested file was not found.', async () => {
         const id = uuid();
 
         await assert.that(async () => {
           await requestPromise({
             method: 'GET',
-            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            uri: `http://localhost:${port}/api/v1/file/${id}`,
             resolveWithFullResponse: true
           });
         }).is.throwingAsync(ex => ex.statusCode === 404);
@@ -160,13 +160,13 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         const contentType = 'application/octet-stream';
 
         const headers = { 'x-metadata': JSON.stringify({ fileName }) };
-        const response = await postAddBlob(port, headers);
+        const response = await postAddFile(port, headers);
 
         const { id } = response.body;
 
         const res = await requestPromise({
           method: 'GET',
-          uri: `http://localhost:${port}/api/v1/blob/${id}`,
+          uri: `http://localhost:${port}/api/v1/file/${id}`,
           resolveWithFullResponse: true
         });
 
@@ -187,13 +187,13 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         const contentType = 'image/png';
 
         const headers = { 'x-metadata': JSON.stringify({ fileName, contentType }) };
-        const response = await postAddBlob(port, headers);
+        const response = await postAddFile(port, headers);
 
         const { id } = response.body;
 
         const res = await requestPromise({
           method: 'GET',
-          uri: `http://localhost:${port}/api/v1/blob/${id}`,
+          uri: `http://localhost:${port}/api/v1/file/${id}`,
           resolveWithFullResponse: true
         });
 
@@ -210,14 +210,14 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
       });
     });
 
-    suite('/api/v1/remove-blob', () => {
+    suite('/api/v1/remove-file', () => {
       test('returns the status code 400 if the x-metadata header is not set.', async () => {
         const headers = {};
 
         await assert.that(async () => {
           await requestPromise({
             method: 'POST',
-            uri: `http://localhost:${port}/api/v1/remove-blob`,
+            uri: `http://localhost:${port}/api/v1/remove-file`,
             headers,
             json: true
           });
@@ -232,7 +232,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         await assert.that(async () => {
           await requestPromise({
             method: 'POST',
-            uri: `http://localhost:${port}/api/v1/remove-blob`,
+            uri: `http://localhost:${port}/api/v1/remove-file`,
             headers,
             json: true
           });
@@ -247,14 +247,14 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         await assert.that(async () => {
           await requestPromise({
             method: 'POST',
-            uri: `http://localhost:${port}/api/v1/remove-blob`,
+            uri: `http://localhost:${port}/api/v1/remove-file`,
             headers,
             json: true
           });
         }).is.throwingAsync(ex => ex.statusCode === 400);
       });
 
-      test('returns the status code 404 if the blob was not found.', async () => {
+      test('returns the status code 404 if the file was not found.', async () => {
         const id = 'not-exists';
         const headers = {
           'x-metadata': JSON.stringify({ id })
@@ -263,7 +263,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         await assert.that(async () => {
           await requestPromise({
             method: 'POST',
-            uri: `http://localhost:${port}/api/v1/remove-blob`,
+            uri: `http://localhost:${port}/api/v1/remove-file`,
             headers,
             json: true
           });
@@ -274,7 +274,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         const headersAdd = {
           'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' })
         };
-        const responseAdd = await postAddBlob(port, headersAdd);
+        const responseAdd = await postAddFile(port, headersAdd);
 
         const { id } = responseAdd.body;
         const headersRemove = {
@@ -283,7 +283,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
 
         const responseRemove = await requestPromise({
           method: 'POST',
-          uri: `http://localhost:${port}/api/v1/remove-blob`,
+          uri: `http://localhost:${port}/api/v1/remove-file`,
           headers: headersRemove,
           resolveWithFullResponse: true
         });
@@ -291,11 +291,11 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         assert.that(responseRemove.statusCode).is.equalTo(200);
       });
 
-      test('actually removes the blob.', async () => {
+      test('actually removes the file.', async () => {
         const headersAdd = {
           'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' })
         };
-        const responseAdd = await postAddBlob(port, headersAdd);
+        const responseAdd = await postAddFile(port, headersAdd);
 
         const { id } = responseAdd.body;
         const headersRemove = {
@@ -304,7 +304,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
 
         await requestPromise({
           method: 'POST',
-          uri: `http://localhost:${port}/api/v1/remove-blob`,
+          uri: `http://localhost:${port}/api/v1/remove-file`,
           headers: headersRemove,
           resolveWithFullResponse: true
         });
@@ -312,7 +312,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         await assert.that(async () => {
           await requestPromise({
             method: 'GET',
-            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            uri: `http://localhost:${port}/api/v1/file/${id}`,
             resolveWithFullResponse: true
           });
         }).is.throwingAsync(ex => ex.statusCode === 404);
@@ -322,11 +322,11 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
     suite('authorization', () => {
       const tokenOwner = issueToken('Jane Doe');
 
-      suite('adding blobs', () => {
+      suite('adding files', () => {
         suite('when access is limited to authenticated users', () => {
           setup(async () => {
             await startServer({
-              addBlobAuthorizationOptions: {
+              addFileAuthorizationOptions: {
                 forAuthenticated: true,
                 forPublic: false
               }
@@ -339,7 +339,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
               authorization: `Bearer ${tokenOwner}`
             };
 
-            const response = await postAddBlob(port, headers);
+            const response = await postAddFile(port, headers);
 
             assert.that(response.statusCode).is.equalTo(200);
           });
@@ -349,7 +349,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
               'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' })
             };
 
-            const response = await postAddBlob(port, headers);
+            const response = await postAddFile(port, headers);
 
             assert.that(response.statusCode).is.equalTo(401);
           });
@@ -358,7 +358,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         suite('when access is limited to authenticated and public users', () => {
           setup(async () => {
             await startServer({
-              addBlobAuthorizationOptions: {
+              addFileAuthorizationOptions: {
                 forAuthenticated: true,
                 forPublic: true
               }
@@ -371,7 +371,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
               authorization: `Bearer ${tokenOwner}`
             };
 
-            const response = await postAddBlob(port, headers);
+            const response = await postAddFile(port, headers);
 
             assert.that(response.statusCode).is.equalTo(200);
           });
@@ -381,7 +381,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
               'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' })
             };
 
-            const response = await postAddBlob(port, headers);
+            const response = await postAddFile(port, headers);
 
             assert.that(response.statusCode).is.equalTo(200);
           });
@@ -390,7 +390,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         suite('when access is forbidden', () => {
           setup(async () => {
             await startServer({
-              addBlobAuthorizationOptions: {
+              addFileAuthorizationOptions: {
                 forAuthenticated: false,
                 forPublic: false
               }
@@ -403,7 +403,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
               authorization: `Bearer ${tokenOwner}`
             };
 
-            const response = await postAddBlob(port, headers);
+            const response = await postAddFile(port, headers);
 
             assert.that(response.statusCode).is.equalTo(401);
           });
@@ -413,7 +413,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
               'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' })
             };
 
-            const response = await postAddBlob(port, headers);
+            const response = await postAddFile(port, headers);
 
             assert.that(response.statusCode).is.equalTo(401);
           });
@@ -426,14 +426,14 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         setup(async () => {
           const isAuthorized = {
             queries: {
-              getBlob: { forAuthenticated: false, forPublic: false }
+              getFile: { forAuthenticated: false, forPublic: false }
             }
           };
           const headersAdd = {
             'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png', isAuthorized }),
             authorization: `Bearer ${tokenOwner}`
           };
-          const responseAdd = await postAddBlob(port, headersAdd);
+          const responseAdd = await postAddFile(port, headersAdd);
 
           id = responseAdd.body.id;
         });
@@ -441,7 +441,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         test('grants access to the owner.', async () => {
           const responseGet = await requestPromise({
             method: 'GET',
-            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            uri: `http://localhost:${port}/api/v1/file/${id}`,
             headers: {
               authorization: `Bearer ${tokenOwner}`
             },
@@ -457,7 +457,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           await assert.that(async () => {
             await requestPromise({
               method: 'GET',
-              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              uri: `http://localhost:${port}/api/v1/file/${id}`,
               headers: {
                 authorization: `Bearer ${tokenOther}`
               },
@@ -470,7 +470,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           await assert.that(async () => {
             await requestPromise({
               method: 'GET',
-              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              uri: `http://localhost:${port}/api/v1/file/${id}`,
               resolveWithFullResponse: true
             });
           }).is.throwingAsync(ex => ex.statusCode === 401);
@@ -483,14 +483,14 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         setup(async () => {
           const isAuthorized = {
             queries: {
-              getBlob: { forAuthenticated: true, forPublic: false }
+              getFile: { forAuthenticated: true, forPublic: false }
             }
           };
           const headersAdd = {
             'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png', isAuthorized }),
             authorization: `Bearer ${tokenOwner}`
           };
-          const responseAdd = await postAddBlob(port, headersAdd);
+          const responseAdd = await postAddFile(port, headersAdd);
 
           id = responseAdd.body.id;
         });
@@ -498,7 +498,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         test('grants access to the owner.', async () => {
           const responseGet = await requestPromise({
             method: 'GET',
-            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            uri: `http://localhost:${port}/api/v1/file/${id}`,
             headers: {
               authorization: `Bearer ${tokenOwner}`
             },
@@ -513,7 +513,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
 
           const responseGet = await requestPromise({
             method: 'GET',
-            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            uri: `http://localhost:${port}/api/v1/file/${id}`,
             headers: {
               authorization: `Bearer ${tokenOther}`
             },
@@ -527,7 +527,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           await assert.that(async () => {
             await requestPromise({
               method: 'GET',
-              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              uri: `http://localhost:${port}/api/v1/file/${id}`,
               resolveWithFullResponse: true
             });
           }).is.throwingAsync(ex => ex.statusCode === 401);
@@ -540,14 +540,14 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         setup(async () => {
           const isAuthorized = {
             queries: {
-              getBlob: { forAuthenticated: true, forPublic: true }
+              getFile: { forAuthenticated: true, forPublic: true }
             }
           };
           const headersAdd = {
             'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png', isAuthorized }),
             authorization: `Bearer ${tokenOwner}`
           };
-          const responseAdd = await postAddBlob(port, headersAdd);
+          const responseAdd = await postAddFile(port, headersAdd);
 
           id = responseAdd.body.id;
         });
@@ -555,7 +555,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         test('grants access to the owner.', async () => {
           const responseGet = await requestPromise({
             method: 'GET',
-            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            uri: `http://localhost:${port}/api/v1/file/${id}`,
             headers: {
               authorization: `Bearer ${tokenOwner}`
             },
@@ -570,7 +570,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
 
           const responseGet = await requestPromise({
             method: 'GET',
-            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            uri: `http://localhost:${port}/api/v1/file/${id}`,
             headers: {
               authorization: `Bearer ${tokenOther}`
             },
@@ -583,7 +583,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         test('grants access to public users.', async () => {
           const responseGet = await requestPromise({
             method: 'GET',
-            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            uri: `http://localhost:${port}/api/v1/file/${id}`,
             resolveWithFullResponse: true
           });
 
@@ -599,7 +599,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
             'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }),
             authorization: `Bearer ${tokenOwner}`
           };
-          const responseAdd = await postAddBlob(port, headersAdd);
+          const responseAdd = await postAddFile(port, headersAdd);
 
           id = responseAdd.body.id;
         });
@@ -607,7 +607,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         test('grants access to the owner.', async () => {
           const responseGet = await requestPromise({
             method: 'GET',
-            uri: `http://localhost:${port}/api/v1/blob/${id}`,
+            uri: `http://localhost:${port}/api/v1/file/${id}`,
             headers: {
               authorization: `Bearer ${tokenOwner}`
             },
@@ -623,7 +623,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           await assert.that(async () => {
             await requestPromise({
               method: 'GET',
-              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              uri: `http://localhost:${port}/api/v1/file/${id}`,
               headers: {
                 authorization: `Bearer ${tokenOther}`
               },
@@ -636,7 +636,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           await assert.that(async () => {
             await requestPromise({
               method: 'GET',
-              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              uri: `http://localhost:${port}/api/v1/file/${id}`,
               resolveWithFullResponse: true
             });
           }).is.throwingAsync(ex => ex.statusCode === 401);
@@ -709,7 +709,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           }).is.throwingAsync(ex => ex.statusCode === 400);
         });
 
-        test('returns the status code 404 if the blob was not found.', async () => {
+        test('returns the status code 404 if the file was not found.', async () => {
           const id = 'not-exists';
           const headers = {
             'x-metadata': JSON.stringify({ id }),
@@ -732,7 +732,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
             authorization: `Bearer ${tokenOwner}`
           };
 
-          const responseAdd = await postAddBlob(port, headersAdd);
+          const responseAdd = await postAddFile(port, headersAdd);
           const id = responseAdd.body.id;
 
           const headersTransferOwnership = {
@@ -754,7 +754,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           await assert.that(async () => {
             await requestPromise({
               method: 'GET',
-              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              uri: `http://localhost:${port}/api/v1/file/${id}`,
               headers: {
                 authorization: `Bearer ${tokenOther}`
               },
@@ -765,7 +765,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           await assert.that(async () => {
             await requestPromise({
               method: 'GET',
-              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              uri: `http://localhost:${port}/api/v1/file/${id}`,
               headers: {
                 authorization: `Bearer ${tokenOwner}`
               },
@@ -834,7 +834,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           }).is.throwingAsync(ex => ex.statusCode === 400);
         });
 
-        test('returns the status code 404 if the blob was not found.', async () => {
+        test('returns the status code 404 if the file was not found.', async () => {
           const id = 'not-exists';
           const isAuthorized = {};
           const headers = {
@@ -857,7 +857,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
             authorization: `Bearer ${tokenOwner}`
           };
 
-          const responseAdd = await postAddBlob(port, headersAdd);
+          const responseAdd = await postAddFile(port, headersAdd);
           const id = responseAdd.body.id;
 
           const isAuthorized = {
@@ -885,18 +885,18 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
             authorization: `Bearer ${tokenOwner}`
           };
 
-          const responseAdd = await postAddBlob(port, headersAdd);
+          const responseAdd = await postAddFile(port, headersAdd);
           const id = responseAdd.body.id;
 
           await assert.that(async () => {
             await requestPromise({
               method: 'GET',
-              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              uri: `http://localhost:${port}/api/v1/file/${id}`,
               resolveWithFullResponse: true
             });
           }).is.throwingAsync(ex => ex.statusCode === 401);
 
-          const isAuthorized = { queries: { getBlob: { forPublic: true }}};
+          const isAuthorized = { queries: { getFile: { forPublic: true }}};
           const headersAuthorize = {
             'x-metadata': JSON.stringify({ id, isAuthorized }),
             authorization: `Bearer ${tokenOwner}`
@@ -915,7 +915,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           await assert.that(async () => {
             await requestPromise({
               method: 'GET',
-              uri: `http://localhost:${port}/api/v1/blob/${id}`,
+              uri: `http://localhost:${port}/api/v1/file/${id}`,
               resolveWithFullResponse: true
             });
           }).is.not.throwingAsync();

@@ -1,6 +1,6 @@
 # wolkenkit-depot
 
-wolkenkit-depot is a blob server.
+wolkenkit-depot is a service for storing large files.
 
 ## Installation
 

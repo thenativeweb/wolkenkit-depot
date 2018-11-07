@@ -9,13 +9,13 @@ const pumpCallback = require('pump'),
 
 const pump = promisify(pumpCallback);
 
-const postAddBlob = async function (port, headers) {
+const postAddFile = async function (port, headers) {
   const file = fs.createReadStream(path.join(__dirname, '..', 'shared', 'data', 'wolkenkit.png'));
 
   const response = await new Promise(async (resolve, reject) => {
     const req = request({
       method: 'POST',
-      uri: `http://localhost:${port}/api/v1/add-blob`,
+      uri: `http://localhost:${port}/api/v1/add-file`,
       headers,
       json: true
     }, (err, res) => {
@@ -36,4 +36,4 @@ const postAddBlob = async function (port, headers) {
   return response;
 };
 
-module.exports = postAddBlob;
+module.exports = postAddFile;

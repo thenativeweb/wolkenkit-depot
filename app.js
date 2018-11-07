@@ -25,7 +25,7 @@ const logger = flaschenpost.getLogger();
 
 const keysDirectory = processenv('KEYS');
 
-const addBlobAuthorizationOptions = processenv('IS_AUTHORIZED_COMMANDS_ADD_BLOB', { forAuthenticated: true, forPublic: false }),
+const addFileAuthorizationOptions = processenv('IS_AUTHORIZED_COMMANDS_ADD_FILE', { forAuthenticated: true, forPublic: false }),
       httpPort = processenv('HTTP_PORT', 80),
       httpsPort = processenv('HTTPS_PORT', 443),
       identityProviderCertificatePath = processenv('IDENTITYPROVIDER_CERTIFICATE'),
@@ -52,8 +52,8 @@ const providerConfiguration = getProviderConfiguration();
       required: [ 'forAuthenticated', 'forPublic' ]
     });
 
-    if (!value.isValid(addBlobAuthorizationOptions)) {
-      throw new Error('Environment variable \'IS_AUTHORIZED_COMMANDS_ADD_BLOB\' is malformed.');
+    if (!value.isValid(addFileAuthorizationOptions)) {
+      throw new Error('Environment variable \'IS_AUTHORIZED_COMMANDS_ADD_FILE\' is malformed.');
     }
 
     const provider = new providers[providerConfiguration.type]();
@@ -61,7 +61,7 @@ const providerConfiguration = getProviderConfiguration();
     await provider.initialize(providerConfiguration);
 
     const api = getApi({
-      addBlobAuthorizationOptions,
+      addFileAuthorizationOptions,
       identityProvider: {
         name: identityProviderName,
         certificate: identityProviderCertificate
