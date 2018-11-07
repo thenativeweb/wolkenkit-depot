@@ -27,6 +27,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
       const identityProviderCertificate = await readFile(path.join(__dirname, '..', 'shared', 'keys', 'certificate.pem'));
 
       const api = getApi({
+        corsOrigin: '*',
         addFileAuthorizationOptions,
         identityProvider: {
           name: 'auth.wolkenkit.io',

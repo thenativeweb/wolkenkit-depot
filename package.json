@@ -19,6 +19,7 @@
     "defekt": "2.0.0",
     "express": "4.16.4",
     "flaschenpost": "1.1.1",
+    "get-cors-origin": "1.0.0",
     "isolated": "1.0.0",
     "limes": "1.1.0",
     "lodash": "4.17.11",

@@ -10,6 +10,7 @@ const fs = require('fs'),
       { promisify } = require('util');
 
 const flaschenpost = require('flaschenpost'),
+      getCorsOrigin = require('get-cors-origin'),
       processenv = require('processenv'),
       spdy = require('spdy'),
       tailwind = require('tailwind'),
@@ -26,6 +27,7 @@ const logger = flaschenpost.getLogger();
 const keysDirectory = processenv('KEYS');
 
 const addFileAuthorizationOptions = processenv('IS_AUTHORIZED_COMMANDS_ADD_FILE', { forAuthenticated: true, forPublic: false }),
+      apiCorsOrigin = getCorsOrigin(processenv('API_CORS_ORIGIN')),
       httpPort = processenv('HTTP_PORT', 80),
       httpsPort = processenv('HTTPS_PORT', 443),
       identityProviderCertificatePath = processenv('IDENTITYPROVIDER_CERTIFICATE'),
@@ -61,6 +63,7 @@ const providerConfiguration = getProviderConfiguration();
     await provider.initialize(providerConfiguration);
 
     const api = getApi({
+      corsOrigin: apiCorsOrigin,
       addFileAuthorizationOptions,
       identityProvider: {
         name: identityProviderName,
