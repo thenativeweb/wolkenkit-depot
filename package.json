@@ -1,6 +1,6 @@
 {
   "name": "wolkenkit-depot",
-  "version": "0.0.2",
+  "version": "1.0.0",
   "description": "wolkenkit-depot is a service for storing large files.",
   "contributors": [
     {
