@@ -29,7 +29,7 @@
     "require-dir": "1.2.0",
     "shelljs": "0.8.3",
     "stream-to-string": "1.1.0",
-    "tailwind": "2.4.1",
+    "tailwind": "3.0.0",
     "uuidv4": "2.0.0",
     "validate-value": "3.0.0"
   },
