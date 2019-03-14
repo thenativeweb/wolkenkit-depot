@@ -24,15 +24,15 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
     const startServer = async function ({ addFileAuthorizationOptions }) {
       await setupProvider();
 
-      const identityProviderCertificate = await readFile(path.join(__dirname, '..', 'shared', 'keys', 'certificate.pem'));
-
       const api = getApi({
         corsOrigin: '*',
         addFileAuthorizationOptions,
-        identityProvider: {
-          name: 'auth.wolkenkit.io',
-          certificate: identityProviderCertificate
-        },
+        identityProviders: [
+          {
+            issuer: 'https://auth.thenativeweb.io',
+            certificate: await readFile(path.join(__dirname, '..', 'shared', 'keys', 'certificate.pem'))
+          }
+        ],
         provider
       });
 

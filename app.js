@@ -26,17 +26,20 @@ const logger = flaschenpost.getLogger();
 const addFileAuthorizationOptions = processenv('IS_AUTHORIZED_COMMANDS_ADD_FILE', { forAuthenticated: true, forPublic: false }),
       apiCorsOrigin = getCorsOrigin(processenv('API_CORS_ORIGIN')),
       httpPort = processenv('HTTP_PORT', 80),
-      identityProviderCertificatePath = processenv('IDENTITYPROVIDER_CERTIFICATE'),
-      identityProviderName = processenv('IDENTITYPROVIDER_NAME'),
       statusCorsOrigin = processenv('STATUS_CORS_ORIGIN', '*'),
       statusPort = processenv('STATUS_PORT', 3333);
+
+const identityProviders = Promise.all(
+  processenv('IDENTITYPROVIDERS', []).map(async identityProvider => ({
+    issuer: identityProvider.issuer,
+    certificate: await readFile(path.join(identityProvider.certificate, 'certificate.pem'))
+  }))
+);
 
 const providerConfiguration = getProviderConfiguration();
 
 (async () => {
   try {
-    const identityProviderCertificate = await readFile(path.join(identityProviderCertificatePath, 'certificate.pem'));
-
     const value = new Value({
       type: 'object',
       properties: {
@@ -58,10 +61,7 @@ const providerConfiguration = getProviderConfiguration();
     const api = getApi({
       corsOrigin: apiCorsOrigin,
       addFileAuthorizationOptions,
-      identityProvider: {
-        name: identityProviderName,
-        certificate: identityProviderCertificate
-      },
+      identityProviders,
       provider
     });
 
