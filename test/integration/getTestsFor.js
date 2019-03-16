@@ -75,9 +75,19 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         assert.that(response.statusCode).is.equalTo(400);
       });
 
-      test('returns the status code 400 if the x-metadata header does not contain the id.', async () => {
+      test('returns the status code 400 if the x-metadata header does not contain an id.', async () => {
         const headers = {
           'x-metadata': JSON.stringify({})
+        };
+
+        const response = await postAddFile(port, headers);
+
+        assert.that(response.statusCode).is.equalTo(400);
+      });
+
+      test('returns the status code 400 if the x-metadata header contains an id with an invalid format.', async () => {
+        const headers = {
+          'x-metadata': JSON.stringify({ id: 'not-a-uuid' })
         };
 
         const response = await postAddFile(port, headers);
@@ -103,6 +113,18 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         const response = await postAddFile(port, headers);
 
         assert.that(response.statusCode).is.equalTo(200);
+      });
+
+      test('returns the status code 409 if the given id is already being used.', async () => {
+        const headers = {
+          'x-metadata': JSON.stringify({ id: uuid(), fileName: 'wolkenkit.png' })
+        };
+
+        await postAddFile(port, headers);
+
+        const response = await postAddFile(port, headers);
+
+        assert.that(response.statusCode).is.equalTo(409);
       });
 
       test('returns the status code 400 if the x-metadata header contains malformed isAuthorized.', async () => {
