@@ -75,7 +75,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         assert.that(response.statusCode).is.equalTo(400);
       });
 
-      test('returns the status code 400 if the x-metadata header does not contain the file name.', async () => {
+      test('returns the status code 400 if the x-metadata header does not contain the id.', async () => {
         const headers = {
           'x-metadata': JSON.stringify({})
         };
@@ -85,22 +85,9 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         assert.that(response.statusCode).is.equalTo(400);
       });
 
-      test('returns an id.', async () => {
-        const headers = { 'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }) };
-
-        const response = await postAddFile(port, headers);
-
-        assert.that(response.statusCode).is.equalTo(200);
-        assert.that(response.body).is.ofType('object');
-        assert.that(response.body.id).is.ofType('string');
-      });
-
-      test('returns the status code 400 if the x-metadata header contains malformed isAuthorized.', async () => {
-        const isAuthorized = {
-          foo: 'bar'
-        };
+      test('returns the status code 400 if the x-metadata header does not contain the file name.', async () => {
         const headers = {
-          'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png', isAuthorized })
+          'x-metadata': JSON.stringify({ id: uuid() })
         };
 
         const response = await postAddFile(port, headers);
@@ -108,7 +95,30 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         assert.that(response.statusCode).is.equalTo(400);
       });
 
-      test('returns an id if the x-metadata header contains valid isAuthorized.', async () => {
+      test('returns the status code 200.', async () => {
+        const headers = {
+          'x-metadata': JSON.stringify({ id: uuid(), fileName: 'wolkenkit.png' })
+        };
+
+        const response = await postAddFile(port, headers);
+
+        assert.that(response.statusCode).is.equalTo(200);
+      });
+
+      test('returns the status code 400 if the x-metadata header contains malformed isAuthorized.', async () => {
+        const isAuthorized = {
+          foo: 'bar'
+        };
+        const headers = {
+          'x-metadata': JSON.stringify({ id: uuid(), fileName: 'wolkenkit.png', isAuthorized })
+        };
+
+        const response = await postAddFile(port, headers);
+
+        assert.that(response.statusCode).is.equalTo(400);
+      });
+
+      test('returns the status code 200 if the x-metadata header contains valid isAuthorized.', async () => {
         const isAuthorized = {
           commands: {
             removeFile: {
@@ -132,14 +142,12 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
           }
         };
         const headers = {
-          'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png', isAuthorized })
+          'x-metadata': JSON.stringify({ id: uuid(), fileName: 'wolkenkit.png', isAuthorized })
         };
 
         const response = await postAddFile(port, headers);
 
         assert.that(response.statusCode).is.equalTo(200);
-        assert.that(response.body).is.ofType('object');
-        assert.that(response.body.id).is.ofType('string');
       });
     });
 
@@ -157,13 +165,13 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
       });
 
       test('returns a stream with x-metadata header and a default content type.', async () => {
+        const id = uuid();
         const fileName = 'wolkenkit.png';
         const contentType = 'application/octet-stream';
 
-        const headers = { 'x-metadata': JSON.stringify({ fileName }) };
-        const response = await postAddFile(port, headers);
+        const headers = { 'x-metadata': JSON.stringify({ id, fileName }) };
 
-        const { id } = response.body;
+        await postAddFile(port, headers);
 
         const res = await requestPromise({
           method: 'GET',
@@ -184,13 +192,13 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
       });
 
       test('returns a stream with x-metadata header and the given content type.', async () => {
+        const id = uuid();
         const fileName = 'wolkenkit.png';
         const contentType = 'image/png';
 
-        const headers = { 'x-metadata': JSON.stringify({ fileName, contentType }) };
-        const response = await postAddFile(port, headers);
+        const headers = { 'x-metadata': JSON.stringify({ id, fileName, contentType }) };
 
-        const { id } = response.body;
+        await postAddFile(port, headers);
 
         const res = await requestPromise({
           method: 'GET',
@@ -272,12 +280,13 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
       });
 
       test('returns the status code 200.', async () => {
+        const id = uuid();
         const headersAdd = {
-          'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' })
+          'x-metadata': JSON.stringify({ id, fileName: 'wolkenkit.png' })
         };
-        const responseAdd = await postAddFile(port, headersAdd);
 
-        const { id } = responseAdd.body;
+        await postAddFile(port, headersAdd);
+
         const headersRemove = {
           'x-metadata': JSON.stringify({ id })
         };
@@ -293,12 +302,13 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
       });
 
       test('actually removes the file.', async () => {
+        const id = uuid();
         const headersAdd = {
-          'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' })
+          'x-metadata': JSON.stringify({ id, fileName: 'wolkenkit.png' })
         };
-        const responseAdd = await postAddFile(port, headersAdd);
 
-        const { id } = responseAdd.body;
+        await postAddFile(port, headersAdd);
+
         const headersRemove = {
           'x-metadata': JSON.stringify({ id })
         };
@@ -321,7 +331,11 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
     });
 
     suite('authorization', () => {
-      const tokenOwner = issueToken('Jane Doe');
+      let tokenOwner;
+
+      suiteSetup(async () => {
+        tokenOwner = await issueToken('Jane Doe');
+      });
 
       suite('adding files', () => {
         suite('when access is limited to authenticated users', () => {
@@ -336,7 +350,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
 
           test('grants access to authenticated users.', async () => {
             const headers = {
-              'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }),
+              'x-metadata': JSON.stringify({ id: uuid(), fileName: 'wolkenkit.png' }),
               authorization: `Bearer ${tokenOwner}`
             };
 
@@ -347,7 +361,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
 
           test('denies access to public users.', async () => {
             const headers = {
-              'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' })
+              'x-metadata': JSON.stringify({ id: uuid(), fileName: 'wolkenkit.png' })
             };
 
             const response = await postAddFile(port, headers);
@@ -368,7 +382,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
 
           test('grants access to authenticated users.', async () => {
             const headers = {
-              'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }),
+              'x-metadata': JSON.stringify({ id: uuid(), fileName: 'wolkenkit.png' }),
               authorization: `Bearer ${tokenOwner}`
             };
 
@@ -379,7 +393,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
 
           test('grants access to public users.', async () => {
             const headers = {
-              'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' })
+              'x-metadata': JSON.stringify({ id: uuid(), fileName: 'wolkenkit.png' })
             };
 
             const response = await postAddFile(port, headers);
@@ -400,7 +414,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
 
           test('denies access to authenticated users.', async () => {
             const headers = {
-              'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }),
+              'x-metadata': JSON.stringify({ id: uuid(), fileName: 'wolkenkit.png' }),
               authorization: `Bearer ${tokenOwner}`
             };
 
@@ -411,7 +425,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
 
           test('denies access to public users.', async () => {
             const headers = {
-              'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' })
+              'x-metadata': JSON.stringify({ id: uuid(), fileName: 'wolkenkit.png' })
             };
 
             const response = await postAddFile(port, headers);
@@ -425,18 +439,19 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         let id;
 
         setup(async () => {
+          id = uuid();
+
           const isAuthorized = {
             queries: {
               getFile: { forAuthenticated: false, forPublic: false }
             }
           };
           const headersAdd = {
-            'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png', isAuthorized }),
+            'x-metadata': JSON.stringify({ id, fileName: 'wolkenkit.png', isAuthorized }),
             authorization: `Bearer ${tokenOwner}`
           };
-          const responseAdd = await postAddFile(port, headersAdd);
 
-          id = responseAdd.body.id;
+          await postAddFile(port, headersAdd);
         });
 
         test('grants access to the owner.', async () => {
@@ -453,7 +468,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         });
 
         test('denies access to authenticated users.', async () => {
-          const tokenOther = issueToken('John Doe');
+          const tokenOther = await issueToken('John Doe');
 
           await assert.that(async () => {
             await requestPromise({
@@ -482,18 +497,19 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         let id;
 
         setup(async () => {
+          id = uuid();
+
           const isAuthorized = {
             queries: {
               getFile: { forAuthenticated: true, forPublic: false }
             }
           };
           const headersAdd = {
-            'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png', isAuthorized }),
+            'x-metadata': JSON.stringify({ id, fileName: 'wolkenkit.png', isAuthorized }),
             authorization: `Bearer ${tokenOwner}`
           };
-          const responseAdd = await postAddFile(port, headersAdd);
 
-          id = responseAdd.body.id;
+          await postAddFile(port, headersAdd);
         });
 
         test('grants access to the owner.', async () => {
@@ -510,7 +526,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         });
 
         test('grants access to authenticated users.', async () => {
-          const tokenOther = issueToken('John Doe');
+          const tokenOther = await issueToken('John Doe');
 
           const responseGet = await requestPromise({
             method: 'GET',
@@ -539,18 +555,19 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         let id;
 
         setup(async () => {
+          id = uuid();
+
           const isAuthorized = {
             queries: {
               getFile: { forAuthenticated: true, forPublic: true }
             }
           };
           const headersAdd = {
-            'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png', isAuthorized }),
+            'x-metadata': JSON.stringify({ id, fileName: 'wolkenkit.png', isAuthorized }),
             authorization: `Bearer ${tokenOwner}`
           };
-          const responseAdd = await postAddFile(port, headersAdd);
 
-          id = responseAdd.body.id;
+          await postAddFile(port, headersAdd);
         });
 
         test('grants access to the owner.', async () => {
@@ -567,7 +584,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         });
 
         test('grants access to authenticated users.', async () => {
-          const tokenOther = issueToken('John Doe');
+          const tokenOther = await issueToken('John Doe');
 
           const responseGet = await requestPromise({
             method: 'GET',
@@ -596,13 +613,14 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         let id;
 
         setup(async () => {
+          id = uuid();
+
           const headersAdd = {
-            'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }),
+            'x-metadata': JSON.stringify({ id, fileName: 'wolkenkit.png' }),
             authorization: `Bearer ${tokenOwner}`
           };
-          const responseAdd = await postAddFile(port, headersAdd);
 
-          id = responseAdd.body.id;
+          await postAddFile(port, headersAdd);
         });
 
         test('grants access to the owner.', async () => {
@@ -619,7 +637,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         });
 
         test('denies access to authenticated users.', async () => {
-          const tokenOther = issueToken('John Doe');
+          const tokenOther = await issueToken('John Doe');
 
           await assert.that(async () => {
             await requestPromise({
@@ -645,7 +663,11 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
       });
 
       suite('/api/v1/transfer-ownership', () => {
-        const tokenOther = issueToken('John Doe');
+        let tokenOther;
+
+        suiteSetup(async () => {
+          tokenOther = await issueToken('John Doe');
+        });
 
         test('returns the status code 400 if the x-metadata header is not set.', async () => {
           const headers = {
@@ -728,13 +750,13 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         });
 
         test('transfers the ownership.', async () => {
+          const id = uuid();
           const headersAdd = {
-            'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }),
+            'x-metadata': JSON.stringify({ id, fileName: 'wolkenkit.png' }),
             authorization: `Bearer ${tokenOwner}`
           };
 
-          const responseAdd = await postAddFile(port, headersAdd);
-          const id = responseAdd.body.id;
+          await postAddFile(port, headersAdd);
 
           const headersTransferOwnership = {
             'x-metadata': JSON.stringify({ id }),
@@ -853,13 +875,13 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         });
 
         test('returns the status code 400 if the x-metadata header contains malformed isAuthorized.', async () => {
+          const id = uuid();
           const headersAdd = {
-            'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }),
+            'x-metadata': JSON.stringify({ id, fileName: 'wolkenkit.png' }),
             authorization: `Bearer ${tokenOwner}`
           };
 
-          const responseAdd = await postAddFile(port, headersAdd);
-          const id = responseAdd.body.id;
+          await postAddFile(port, headersAdd);
 
           const isAuthorized = {
             foo: 'bar'
@@ -881,13 +903,13 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         });
 
         test('changes the authorization.', async () => {
+          const id = uuid();
           const headersAdd = {
-            'x-metadata': JSON.stringify({ fileName: 'wolkenkit.png' }),
+            'x-metadata': JSON.stringify({ id, fileName: 'wolkenkit.png' }),
             authorization: `Bearer ${tokenOwner}`
           };
 
-          const responseAdd = await postAddFile(port, headersAdd);
-          const id = responseAdd.body.id;
+          await postAddFile(port, headersAdd);
 
           await assert.that(async () => {
             await requestPromise({
