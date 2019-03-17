@@ -29,17 +29,17 @@ const addFileAuthorizationOptions = processenv('IS_AUTHORIZED_COMMANDS_ADD_FILE'
       statusCorsOrigin = processenv('STATUS_CORS_ORIGIN', '*'),
       statusPort = processenv('STATUS_PORT', 3333);
 
-const identityProviders = Promise.all(
-  processenv('IDENTITYPROVIDERS', []).map(async identityProvider => ({
-    issuer: identityProvider.issuer,
-    certificate: await readFile(path.join(identityProvider.certificate, 'certificate.pem'))
-  }))
-);
-
 const providerConfiguration = getProviderConfiguration();
 
 (async () => {
   try {
+    const identityProviders = await Promise.all(
+      processenv('IDENTITYPROVIDERS', []).map(async identityProvider => ({
+        issuer: identityProvider.issuer,
+        certificate: await readFile(path.join(identityProvider.certificate, 'certificate.pem'))
+      }))
+    );
+
     const value = new Value({
       type: 'object',
       properties: {
