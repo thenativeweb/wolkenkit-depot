@@ -10,7 +10,7 @@ suite('S3', async () => {
     await provider.initialize({
       endpoint: 'localhost',
       port: 9001,
-      useSSL: false,
+      useSsl: false,
       accessKey: 'wolkenkit',
       secretKey: 'wolkenkit',
       bucketName: 'integration-tests'
