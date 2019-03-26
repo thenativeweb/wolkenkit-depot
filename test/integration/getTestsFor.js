@@ -15,7 +15,8 @@ const getApi = require('../../lib/getApi'),
       issueToken = require('./issueToken'),
       postAddFile = require('./postAddFile');
 
-const readFile = promisify(fs.readFile);
+const readFile = promisify(fs.readFile),
+      stat = promisify(fs.stat);
 
 const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
   suite('api', () => {
@@ -186,10 +187,9 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         }).is.throwingAsync(ex => ex.statusCode === 404);
       });
 
-      test('returns a stream with x-metadata header and a default content type.', async () => {
+      test('returns a stream with x-metadata header.', async () => {
         const id = uuid();
         const fileName = 'wolkenkit.png';
-        const contentType = 'application/octet-stream';
 
         const headers = { 'x-metadata': JSON.stringify({ id, fileName }) };
 
@@ -203,17 +203,37 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
 
         const metadata = JSON.parse(res.headers['x-metadata']);
 
-        assert.that(res.headers['content-type']).is.equalTo('application/octet-stream');
         assert.that(res.headers['content-disposition']).is.equalTo(`inline; filename=${fileName}`);
 
         assert.that(metadata.id).is.equalTo(id);
         assert.that(metadata.fileName).is.equalTo(fileName);
-        assert.that(metadata.contentType).is.equalTo(contentType);
 
         assert.that(res).is.instanceOf(Readable);
       });
 
-      test('returns a stream with x-metadata header and the given content type.', async () => {
+      test('returns a stream with a content length.', async () => {
+        const id = uuid();
+        const fileName = 'wolkenkit.png';
+
+        const { size } = await stat(path.join(__dirname, '..', 'shared', 'data', 'wolkenkit.png'));
+
+        const headers = { 'x-metadata': JSON.stringify({ id, fileName }) };
+
+        await postAddFile(port, headers);
+
+        const res = await requestPromise({
+          method: 'GET',
+          uri: `http://localhost:${port}/api/v1/file/${id}`,
+          resolveWithFullResponse: true
+        });
+
+        const metadata = JSON.parse(res.headers['x-metadata']);
+
+        assert.that(Number(res.headers['content-length'])).is.equalTo(size);
+        assert.that(metadata.contentLength).is.equalTo(size);
+      });
+
+      test('returns a stream with the given content type.', async () => {
         const id = uuid();
         const fileName = 'wolkenkit.png';
         const contentType = 'image/png';
@@ -231,13 +251,7 @@ const getTestsFor = function ({ provider, setupProvider, teardownProvider }) {
         const metadata = JSON.parse(res.headers['x-metadata']);
 
         assert.that(res.headers['content-type']).is.equalTo(contentType);
-        assert.that(res.headers['content-disposition']).is.equalTo(`inline; filename=${fileName}`);
-
-        assert.that(metadata.id).is.equalTo(id);
-        assert.that(metadata.fileName).is.equalTo(fileName);
         assert.that(metadata.contentType).is.equalTo(contentType);
-
-        assert.that(res).is.instanceOf(Readable);
       });
     });
 
