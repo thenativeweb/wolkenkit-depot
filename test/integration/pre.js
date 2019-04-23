@@ -27,7 +27,7 @@ const pre = async function () {
       secretKey: 'wolkenkit'
     });
 
-    await client.makeBucket('integration-tests');
+    await client.bucketExists('integration-tests');
   });
 };
 
