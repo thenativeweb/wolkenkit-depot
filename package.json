@@ -27,7 +27,7 @@
     "processenv": "1.1.0",
     "pump": "3.0.0",
     "require-dir": "1.2.0",
-    "shelljs": "0.8.3",
+    "shelljs": "0.8.5",
     "stream-to-string": "1.2.0",
     "tailwind": "4.0.0",
     "uuidv4": "3.0.1",
